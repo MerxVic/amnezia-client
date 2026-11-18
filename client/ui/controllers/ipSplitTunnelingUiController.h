@@ -22,6 +22,7 @@ public slots:
     void removeSite(int index);
     void removeSites();
     void importSites(const QString &fileName, bool replaceExisting);
+    void importManagedBypassPolicy(const QString &fileName);
     void exportSites(const QString &fileName);
     void toggleSplitTunneling(bool enabled);
     void setRouteMode(int routeMode);

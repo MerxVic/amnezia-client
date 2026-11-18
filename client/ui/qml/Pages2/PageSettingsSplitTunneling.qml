@@ -228,6 +228,24 @@ PageType {
         id: moreActionsMenu
 
         PopupMenuItemType {
+            text: qsTr("Import direct-route policy")
+
+            onClicked: {
+                moreActionsMenu.close()
+                const fileName = SystemController.getFileName(qsTr("Open direct-route policy"),
+                                                              qsTr("JSON files (*.json)"))
+                if (fileName === "") return
+                Dialogs.askQuestion(qsTr("Replace direct-route list?"),
+                                    qsTr("The imported policy will replace the current direct-route list."),
+                                    qsTr("Continue"), qsTr("Cancel"),
+                                    function() { IpSplitTunnelingController.importManagedBypassPolicy(fileName) },
+                                    function() {})
+            }
+        }
+
+        PopupMenuSeparatorType {}
+
+        PopupMenuItemType {
             id: addImportedSitesButton
 
             text: qsTr("Add imported sites to existing ones")

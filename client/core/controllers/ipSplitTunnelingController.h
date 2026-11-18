@@ -36,6 +36,7 @@ public:
     QVector<QPair<QString, QStringList>> getCurrentSites() const;
 
     bool importSitesFromJson(const QByteArray& jsonData, bool replaceExisting, QString &errorMessage);
+    bool importManagedBypassPolicy(const QByteArray& jsonData, QString &errorMessage);
     QByteArray exportSitesToJson() const;
 
 private slots:

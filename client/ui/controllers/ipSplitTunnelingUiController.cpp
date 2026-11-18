@@ -54,6 +54,24 @@ void IpSplitTunnelingUiController::importSites(const QString &fileName, bool rep
     }
 }
 
+void IpSplitTunnelingUiController::importManagedBypassPolicy(const QString &fileName)
+{
+    QByteArray jsonData;
+    if (!SystemController::readFile(fileName, jsonData)) {
+        emit errorOccurred(tr("Can't open file: %1").arg(fileName));
+        return;
+    }
+    QString errorMessage;
+    if (m_ipSplitTunnelingController->importManagedBypassPolicy(jsonData, errorMessage)) {
+        updateModel();
+        emit routeModeChanged();
+        emit isSplitTunnelingEnabledChanged();
+        emit finished(tr("Direct-route list imported"));
+    } else {
+        emit errorOccurred(errorMessage);
+    }
+}
+
 void IpSplitTunnelingUiController::exportSites(const QString &fileName)
 {
     QByteArray jsonData = m_ipSplitTunnelingController->exportSitesToJson();

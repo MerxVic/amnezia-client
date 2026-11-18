@@ -2,6 +2,9 @@
 #include "core/utils/networkUtilities.h"
 #include <QJsonObject>
 #include <QDebug>
+#include <QHostAddress>
+#include <QRegularExpression>
+#include <QSet>
 
 IpSplitTunnelingController::IpSplitTunnelingController(SecureAppSettingsRepository* appSettingsRepository, QObject* parent)
     : QObject(parent),
@@ -263,6 +266,78 @@ bool IpSplitTunnelingController::importSitesFromJson(const QByteArray& jsonData,
     
     addSites(sites, replaceExisting);
     
+    return true;
+}
+
+bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jsonData, QString &errorMessage)
+{
+    // Validate the whole response before replacing any local routing settings.
+    if (jsonData.size() > 256 * 1024) {
+        errorMessage = tr("The bypass list is too large");
+        return false;
+    }
+    QJsonParseError parseError;
+    const QJsonDocument document = QJsonDocument::fromJson(jsonData, &parseError);
+    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+        errorMessage = tr("Invalid bypass list JSON");
+        return false;
+    }
+    const QJsonObject policy = document.object();
+    if (policy.value("version").toInt(-1) != 1 ||
+        !policy.value("domains").isArray() || !policy.value("cidrs").isArray()) {
+        errorMessage = tr("Unsupported bypass list format");
+        return false;
+    }
+    const QJsonArray domains = policy.value("domains").toArray();
+    const QJsonArray cidrs = policy.value("cidrs").toArray();
+    if (domains.size() + cidrs.size() > 2048) {
+        errorMessage = tr("The bypass list has too many entries");
+        return false;
+    }
+
+    static const QRegularExpression domainPattern(
+        QStringLiteral("^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"));
+    QStringList entries;
+    QSet<QString> seen;
+    for (const QJsonValue &value : domains) {
+        if (!value.isString()) {
+            errorMessage = tr("Invalid domain in bypass list");
+            return false;
+        }
+        const QString domain = value.toString().trimmed().toLower();
+        if (!domainPattern.match(domain).hasMatch()) {
+            errorMessage = tr("Invalid domain in bypass list");
+            return false;
+        }
+        if (!seen.contains(domain)) {
+            seen.insert(domain);
+            entries.append(domain);
+        }
+    }
+    for (const QJsonValue &value : cidrs) {
+        if (!value.isString()) {
+            errorMessage = tr("Invalid IP range in bypass list");
+            return false;
+        }
+        const QString cidr = value.toString().trimmed();
+        const auto subnet = QHostAddress::parseSubnet(cidr);
+        if (subnet.first.protocol() != QAbstractSocket::IPv4Protocol ||
+            subnet.second < 0 || subnet.second > 32 || subnet.second == 0) {
+            errorMessage = tr("Invalid IP range in bypass list");
+            return false;
+        }
+        if (!seen.contains(cidr)) {
+            seen.insert(cidr);
+            entries.append(cidr);
+        }
+    }
+
+    setRouteMode(RouteMode::VpnAllExceptSites);
+    removeSites();
+    for (const QString &entry : entries) {
+        addSite(entry); // Existing resolver expands domains to IPv4 routes.
+    }
+    toggleSplitTunneling(true);
     return true;
 }
 
