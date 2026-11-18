@@ -2,6 +2,8 @@
 #define IPSPLITTUNNELINGUICONTROLLER_H
 
 #include <QObject>
+#include <QByteArray>
+#include <QNetworkAccessManager>
 
 #include "core/controllers/ipSplitTunnelingController.h"
 #include "ui/models/ipSplitTunnelingModel.h"
@@ -23,6 +25,7 @@ public slots:
     void removeSites();
     void importSites(const QString &fileName, bool replaceExisting);
     void importManagedBypassPolicy(const QString &fileName);
+    void downloadManagedBypassPolicy(const QString &url);
     void exportSites(const QString &fileName);
     void toggleSplitTunneling(bool enabled);
     void setRouteMode(int routeMode);
@@ -42,6 +45,8 @@ signals:
 private:
     IpSplitTunnelingController* m_ipSplitTunnelingController;
     IpSplitTunnelingModel* m_ipSplitTunnelingModel;
+    QNetworkAccessManager m_policyNetwork;
+    bool m_policyDownloadActive = false;
 };
 
 #endif // IPSPLITTUNNELINGUICONTROLLER_H

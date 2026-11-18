@@ -50,7 +50,8 @@ can affect unrelated domains. IPv6 needs a separate verified implementation.
 
 The first parser is `IpSplitTunnelingController::importManagedBypassPolicy`.
 It validates a bounded JSON response and maps it to the upstream direct-route
-mode. Its first UI entry imports a downloaded file; authenticated profile
+mode. The settings screen can import a downloaded file or fetch the public
+list directly from a supplied HTTPS panel URL. Authenticated profile
 provisioning, periodic refresh, and separate managed/manual storage remain to
 be implemented. The public list does not require a device token.
 

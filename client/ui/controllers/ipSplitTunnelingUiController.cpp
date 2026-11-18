@@ -1,6 +1,10 @@
 #include "ipSplitTunnelingUiController.h"
 
 #include <QDebug>
+#include <QNetworkReply>
+#include <QNetworkRequest>
+#include <QUrl>
+#include <memory>
 
 #include "systemController.h"
 #include "core/utils/errorCodes.h"
@@ -70,6 +74,53 @@ void IpSplitTunnelingUiController::importManagedBypassPolicy(const QString &file
     } else {
         emit errorOccurred(errorMessage);
     }
+}
+
+void IpSplitTunnelingUiController::downloadManagedBypassPolicy(const QString &urlText)
+{
+    const QUrl url(urlText);
+    if (m_policyDownloadActive || !url.isValid() || url.scheme() != QLatin1String("https") ||
+        url.host().isEmpty() || !url.userInfo().isEmpty() || url.hasQuery() ||
+        url.hasFragment() || url.path() != QLatin1String("/downloads/ru-bypass-ip-list.json")) {
+        emit errorOccurred(tr("Enter a valid HTTPS bypass-list URL"));
+        return;
+    }
+    QNetworkRequest request(url);
+    request.setTransferTimeout(15000);
+    request.setAttribute(QNetworkRequest::RedirectPolicyAttribute,
+                         QNetworkRequest::ManualRedirectPolicy);
+    m_policyDownloadActive = true;
+    QNetworkReply *reply = m_policyNetwork.get(request);
+    auto content = std::make_shared<QByteArray>();
+    auto tooLarge = std::make_shared<bool>(false);
+    connect(reply, &QNetworkReply::readyRead, this, [reply, content, tooLarge]() {
+        if (*tooLarge) return;
+        content->append(reply->readAll());
+        if (content->size() > 256 * 1024) {
+            *tooLarge = true;
+            reply->abort();
+        }
+    });
+    connect(reply, &QNetworkReply::finished, this, [this, reply, content, tooLarge]() {
+        m_policyDownloadActive = false;
+        if (!*tooLarge) content->append(reply->readAll());
+        const bool received = !*tooLarge && reply->error() == QNetworkReply::NoError &&
+                              reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200;
+        reply->deleteLater();
+        if (!received) {
+            emit errorOccurred(tr("Could not download the bypass list"));
+            return;
+        }
+        QString errorMessage;
+        if (!m_ipSplitTunnelingController->importManagedBypassPolicy(*content, errorMessage)) {
+            emit errorOccurred(errorMessage);
+            return;
+        }
+        updateModel();
+        emit routeModeChanged();
+        emit isSplitTunnelingEnabledChanged();
+        emit finished(tr("Direct-route list updated"));
+    });
 }
 
 void IpSplitTunnelingUiController::exportSites(const QString &fileName)

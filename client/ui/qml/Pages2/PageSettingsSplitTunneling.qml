@@ -228,6 +228,15 @@ PageType {
         id: moreActionsMenu
 
         PopupMenuItemType {
+            text: qsTr("Download direct-route list")
+
+            onClicked: {
+                moreActionsMenu.close()
+                bypassUrlDialog.open()
+            }
+        }
+
+        PopupMenuItemType {
             text: qsTr("Import direct-route policy")
 
             onClicked: {
@@ -317,6 +326,30 @@ PageType {
 
                 Dialogs.askQuestion(headerText, descriptionText, yesButtonText, noButtonText, yesButtonFunction, noButtonFunction)
             }
+        }
+    }
+
+    Dialog {
+        id: bypassUrlDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 32, 440)
+        modal: true
+        title: qsTr("Direct-route list URL")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            Dialogs.askQuestion(qsTr("Replace direct-route list?"),
+                                qsTr("The downloaded list will replace the current direct-route list."),
+                                qsTr("Continue"), qsTr("Cancel"),
+                                function() { IpSplitTunnelingController.downloadManagedBypassPolicy(bypassUrlField.text) },
+                                function() {})
+        }
+
+        contentItem: TextField {
+            id: bypassUrlField
+            width: bypassUrlDialog.width - 32
+            placeholderText: qsTr("https://…/downloads/ru-bypass-ip-list.json")
+            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
         }
     }
 
