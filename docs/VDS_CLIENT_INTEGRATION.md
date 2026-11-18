@@ -25,7 +25,8 @@ never places credentials in a URL, log, crash report, or VPN profile export.
 
 AWG is the primary connection. VLESS Reality is a separate client connection,
 not a fallback transport inside AWG. Existing server-to-server QUIC routes do
-not expose a mobile QUIC endpoint. A client-facing QUIC engine and its matching
+not expose a mobile QUIC endpoint. Client-facing QUIC is reserved for a future
+extension; it is outside the current delivery scope. Its engine and matching
 server entry must be chosen and tested before enabling this protocol in the UI.
 Each connection type must be tested on mobile data and Wi-Fi, including DNS
 failover, reconnect, tunnel shutdown, and visible exit IP.
@@ -86,8 +87,7 @@ rechecks access for every authenticated request.
    manual rules separately from the managed list. Apply updates only after the
    active VPN tunnel can safely reload routes or during controlled reconnect.
 3. Add the two role-specific interfaces, including Android TV remote navigation.
-4. Verify AWG and VLESS on real devices. Add mobile QUIC only after a matching
-   client-facing server endpoint passes end-to-end tests.
+4. Verify AWG and VLESS on real devices.
 5. Build and sign Android and iOS artifacts with the owner's signing accounts.
 
 The upstream project is GPL-3.0; distributed modified clients must retain the
