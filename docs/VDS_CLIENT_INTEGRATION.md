@@ -58,9 +58,11 @@ It validates a bounded JSON response and maps it to the upstream direct-route
 mode. The settings screen can import a downloaded file or fetch the public
 list directly from a supplied HTTPS panel URL. After the first successful
 download, the app checks that URL hourly and applies new rules when the VPN is
-disconnected. At this stage, each accepted update replaces the local direct
-route list; separate managed/manual storage remains to be implemented. The
-public list does not require a device token.
+disconnected. Manual and panel rules are stored separately. A new panel list
+replaces only the previous panel list; the active routes contain both sets.
+Existing direct-route entries are treated as manual rules on first migration.
+Panel rules are read-only in the settings screen. The public list does not
+require a device token.
 
 The connection-key screen now accepts a panel URL and client account. It
 downloads the account's own `.vpn` profile into the existing import review
@@ -83,9 +85,9 @@ rechecks access for every authenticated request.
 
 1. Add panel endpoints for device enrollment, own-profile download, and
    client-safe status. Test role enforcement and revocation.
-2. Wire policy download and refresh into the client. Preserve
-   manual rules separately from the managed list. Apply updates only after the
-   active VPN tunnel can safely reload routes or during controlled reconnect.
+2. Verify policy refresh and manual-rule preservation on devices. Apply updates
+   only after the active VPN tunnel can safely reload routes or during controlled
+   reconnect.
 3. Add the two role-specific interfaces, including Android TV remote navigation.
 4. Verify AWG and VLESS on real devices.
 5. Build and sign Android and iOS artifacts with the owner's signing accounts.

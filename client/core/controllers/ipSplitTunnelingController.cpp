@@ -16,6 +16,12 @@ IpSplitTunnelingController::IpSplitTunnelingController(SecureAppSettingsReposito
         m_currentRouteMode = RouteMode::VpnOnlyForwardSites;
     }
     fillSites();
+    if (m_appSettingsRepository->hasSeparatedBypassSites()) {
+        m_manualBypassSites = m_appSettingsRepository->manualBypassSites();
+        m_managedBypassSites = m_appSettingsRepository->managedBypassSites();
+    } else {
+        m_manualBypassSites = m_appSettingsRepository->vpnSites(RouteMode::VpnAllExceptSites);
+    }
 }
 
 bool IpSplitTunnelingController::addSiteInternal(const QString &hostname, const QStringList &ips)
@@ -48,6 +54,23 @@ bool IpSplitTunnelingController::addSiteInternal(const QString &hostname, const 
 
 void IpSplitTunnelingController::addSites(const QMap<QString, QStringList> &sites, bool replaceExisting)
 {
+    if (m_currentRouteMode == RouteMode::VpnAllExceptSites) {
+        if (replaceExisting) {
+            m_manualBypassSites.clear();
+        }
+        for (auto it = sites.constBegin(); it != sites.constEnd(); ++it) {
+            QStringList ips = SecureAppSettingsRepository::siteIpList(m_manualBypassSites.value(it.key()));
+            for (const QString &ip : it.value()) {
+                if (!ip.isEmpty() && !ips.contains(ip)) {
+                    ips.append(ip);
+                }
+            }
+            m_manualBypassSites.insert(it.key(), ips);
+        }
+        m_appSettingsRepository->setManualBypassSites(m_manualBypassSites);
+        rebuildBypassSites();
+        return;
+    }
     if (replaceExisting) {
         m_sites.clear();
     }
@@ -83,6 +106,19 @@ bool IpSplitTunnelingController::addSite(const QString &hostname)
     if (!validateHostname(normalizedHostname)) {
         return false;
     }
+
+    if (m_currentRouteMode == RouteMode::VpnAllExceptSites) {
+        if (m_manualBypassSites.contains(normalizedHostname)) {
+            return false;
+        }
+        m_manualBypassSites.insert(normalizedHostname, QStringList());
+        m_appSettingsRepository->setManualBypassSites(m_manualBypassSites);
+        rebuildBypassSites();
+        if (!NetworkUtilities::ipAddressWithSubnetRegExp().exactMatch(normalizedHostname)) {
+            QHostInfo::lookupHost(normalizedHostname, this, SLOT(onHostResolved(QHostInfo)));
+        }
+        return true;
+    }
     
     if (NetworkUtilities::ipAddressWithSubnetRegExp().exactMatch(normalizedHostname)) {
         processSite(normalizedHostname, {});
@@ -99,6 +135,15 @@ bool IpSplitTunnelingController::addSite(const QString &hostname)
 
 bool IpSplitTunnelingController::removeSite(const QString &hostname)
 {
+    if (m_currentRouteMode == RouteMode::VpnAllExceptSites) {
+        if (m_managedBypassSites.contains(hostname) || !m_manualBypassSites.contains(hostname)) {
+            return false;
+        }
+        m_manualBypassSites.remove(hostname);
+        m_appSettingsRepository->setManualBypassSites(m_manualBypassSites);
+        rebuildBypassSites();
+        return true;
+    }
     for (int i = 0; i < m_sites.size(); i++) {
         if (m_sites[i].first == hostname) {
             m_sites.removeAt(i);
@@ -111,6 +156,12 @@ bool IpSplitTunnelingController::removeSite(const QString &hostname)
 
 void IpSplitTunnelingController::removeSites()
 {
+    if (m_currentRouteMode == RouteMode::VpnAllExceptSites) {
+        m_manualBypassSites.clear();
+        m_appSettingsRepository->setManualBypassSites(m_manualBypassSites);
+        rebuildBypassSites();
+        return;
+    }
     m_sites.clear();
     m_appSettingsRepository->removeAllVpnSites(m_currentRouteMode);
 }
@@ -140,6 +191,34 @@ bool IpSplitTunnelingController::isSplitTunnelingEnabled() const
 QVector<QPair<QString, QStringList>> IpSplitTunnelingController::getCurrentSites() const
 {
     return m_sites;
+}
+
+bool IpSplitTunnelingController::isManagedBypassSite(const QString &hostname) const
+{
+    return m_currentRouteMode == RouteMode::VpnAllExceptSites && m_managedBypassSites.contains(hostname);
+}
+
+bool IpSplitTunnelingController::hasManagedBypassSites() const
+{
+    return !m_managedBypassSites.isEmpty();
+}
+
+void IpSplitTunnelingController::rebuildBypassSites()
+{
+    QMap<QString, QStringList> combined;
+    for (auto it = m_manualBypassSites.constBegin(); it != m_manualBypassSites.constEnd(); ++it) {
+        combined.insert(it.key(), SecureAppSettingsRepository::siteIpList(it.value()));
+    }
+    for (const QString &hostname : m_managedBypassSites) {
+        if (!combined.contains(hostname)) {
+            combined.insert(hostname, QStringList());
+        }
+    }
+    m_appSettingsRepository->removeAllVpnSites(RouteMode::VpnAllExceptSites);
+    m_appSettingsRepository->addVpnSites(RouteMode::VpnAllExceptSites, combined);
+    if (m_currentRouteMode == RouteMode::VpnAllExceptSites) {
+        fillSites();
+    }
 }
 
 void IpSplitTunnelingController::fillSites()
@@ -200,8 +279,10 @@ void IpSplitTunnelingController::onHostResolved(const QHostInfo &hostInfo)
 
 void IpSplitTunnelingController::processSiteAfterResolve(const QString &hostname, const QStringList &ips)
 {
+    bool found = false;
     for (int i = 0; i < m_sites.size(); i++) {
         if (m_sites[i].first == hostname) {
+            found = true;
             for (const QString &ip : ips) {
                 if (!ip.isEmpty() && !m_sites[i].second.contains(ip)) {
                     m_sites[i].second.append(ip);
@@ -209,6 +290,19 @@ void IpSplitTunnelingController::processSiteAfterResolve(const QString &hostname
             }
             break;
         }
+    }
+    if (!found) {
+        return;
+    }
+    if (m_currentRouteMode == RouteMode::VpnAllExceptSites && m_manualBypassSites.contains(hostname)) {
+        QStringList manualIps = SecureAppSettingsRepository::siteIpList(m_manualBypassSites.value(hostname));
+        for (const QString &ip : ips) {
+            if (!manualIps.contains(ip)) {
+                manualIps.append(ip);
+            }
+        }
+        m_manualBypassSites.insert(hostname, manualIps);
+        m_appSettingsRepository->setManualBypassSites(m_manualBypassSites);
     }
     m_appSettingsRepository->addVpnSite(m_currentRouteMode, hostname, ips);
 }
@@ -328,10 +422,14 @@ bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jso
         }
     }
 
+    m_managedBypassSites = entries;
+    m_appSettingsRepository->setManagedBypassSites(entries);
     setRouteMode(RouteMode::VpnAllExceptSites);
-    removeSites();
+    rebuildBypassSites();
     for (const QString &entry : entries) {
-        addSite(entry); // Existing resolver expands domains to IPv4 routes.
+        if (!NetworkUtilities::ipAddressWithSubnetRegExp().exactMatch(entry)) {
+            QHostInfo::lookupHost(entry, this, SLOT(onHostResolved(QHostInfo)));
+        }
     }
     toggleSplitTunneling(true);
     if (unsupportedWildcards) {

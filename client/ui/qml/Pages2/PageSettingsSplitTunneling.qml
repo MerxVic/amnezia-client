@@ -192,8 +192,10 @@ PageType {
                 anchors.rightMargin: 16
 
                 text: url
-                subtitle: ip
+                subtitle: IpSplitTunnelingController.isManagedBypassSite(url)
+                          ? qsTr("Managed by panel") : ip
                 trailingIconSource: "qrc:/images/controls/trash.svg"
+                enabled: !IpSplitTunnelingController.isManagedBypassSite(url)
 
                 onClicked: {
                     var headerText = qsTr("Remove ") + url + "?"
@@ -255,8 +257,8 @@ PageType {
                 const fileName = SystemController.getFileName(qsTr("Open direct-route policy"),
                                                               qsTr("JSON files (*.json)"))
                 if (fileName === "") return
-                Dialogs.askQuestion(qsTr("Replace direct-route list?"),
-                                    qsTr("The imported policy will replace the current direct-route list."),
+                Dialogs.askQuestion(qsTr("Replace panel rules?"),
+                                    qsTr("The imported policy will replace panel rules. Manual rules will stay."),
                                     qsTr("Continue"), qsTr("Cancel"),
                                     function() { IpSplitTunnelingController.importManagedBypassPolicy(fileName) },
                                     function() {})
@@ -317,13 +319,17 @@ PageType {
         PopupMenuItemType {
             id: clearSitesButton
 
-            text: qsTr("Clear site list")
+            text: IpSplitTunnelingController.hasManagedBypassSites
+                  ? qsTr("Clear manual sites") : qsTr("Clear site list")
             destructive: true
 
             onClicked: {
                 moreActionsMenu.close()
-                var headerText = qsTr("Clear site list?")
-                var descriptionText = qsTr("All sites will be removed from list.")
+                var headerText = IpSplitTunnelingController.hasManagedBypassSites
+                                 ? qsTr("Clear manual sites?") : qsTr("Clear site list?")
+                var descriptionText = IpSplitTunnelingController.hasManagedBypassSites
+                                      ? qsTr("Panel rules will remain active.")
+                                      : qsTr("All sites will be removed from list.")
                 var yesButtonText = qsTr("Continue")
                 var noButtonText = qsTr("Cancel")
 
@@ -349,8 +355,8 @@ PageType {
         title: qsTr("Direct-route list URL")
         standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: {
-            Dialogs.askQuestion(qsTr("Replace direct-route list?"),
-                                qsTr("The downloaded list will replace the current direct-route list and refresh hourly."),
+            Dialogs.askQuestion(qsTr("Replace panel rules?"),
+                                qsTr("The downloaded list will replace panel rules and refresh hourly. Manual rules will stay."),
                                 qsTr("Continue"), qsTr("Cancel"),
                                 function() { IpSplitTunnelingController.downloadManagedBypassPolicy(bypassUrlField.text) },
                                 function() {})

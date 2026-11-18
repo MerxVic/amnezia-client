@@ -42,6 +42,7 @@ IpSplitTunnelingUiController::IpSplitTunnelingUiController(IpSplitTunnelingContr
 void IpSplitTunnelingUiController::addSite(QString hostname)
 {
     if (m_ipSplitTunnelingController->addSite(hostname)) {
+        updateModel();
         emit finished(tr("New site added: %1").arg(hostname));
     }
 }
@@ -51,14 +52,18 @@ void IpSplitTunnelingUiController::removeSite(int index)
     auto modelIndex = m_ipSplitTunnelingModel->index(index);
     auto hostname = m_ipSplitTunnelingModel->data(modelIndex, IpSplitTunnelingModel::Roles::UrlRole).toString();
     if (m_ipSplitTunnelingController->removeSite(hostname)) {
+        updateModel();
         emit finished(tr("Site removed: %1").arg(hostname));
     }
 }
 
 void IpSplitTunnelingUiController::removeSites()
 {
+    const bool preserveManaged = m_ipSplitTunnelingController->getRouteMode() == amnezia::RouteMode::VpnAllExceptSites &&
+                                 m_ipSplitTunnelingController->hasManagedBypassSites();
     m_ipSplitTunnelingController->removeSites();
-    emit finished(tr("Site list cleared!"));
+    updateModel();
+    emit finished(preserveManaged ? tr("Manual site list cleared") : tr("Site list cleared!"));
 }
 
 void IpSplitTunnelingUiController::importSites(const QString &fileName, bool replaceExisting)
@@ -71,6 +76,7 @@ void IpSplitTunnelingUiController::importSites(const QString &fileName, bool rep
 
     QString errorMessage;
     if (m_ipSplitTunnelingController->importSitesFromJson(jsonData, replaceExisting, errorMessage)) {
+        updateModel();
         emit finished(tr("Import completed"));
     } else {
         emit errorOccurred(errorMessage);
@@ -88,6 +94,7 @@ void IpSplitTunnelingUiController::importManagedBypassPolicy(const QString &file
     if (m_ipSplitTunnelingController->importManagedBypassPolicy(jsonData, errorMessage)) {
         m_managedPolicyWarning = errorMessage;
         emit managedPolicyWarningChanged();
+        emit managedPolicyChanged();
         updateModel();
         emit routeModeChanged();
         emit isSplitTunnelingEnabledChanged();
@@ -156,6 +163,7 @@ void IpSplitTunnelingUiController::applyPendingPolicy()
     m_pendingPolicy.clear();
     m_managedPolicyWarning = errorMessage;
     emit managedPolicyWarningChanged();
+    emit managedPolicyChanged();
     const QString acceptedUrl = m_pendingPolicyUrl.toString();
     if (m_managedPolicyUrl != acceptedUrl) {
         m_managedPolicyUrl = acceptedUrl;
@@ -200,6 +208,16 @@ int IpSplitTunnelingUiController::getRouteMode() const
 bool IpSplitTunnelingUiController::isSplitTunnelingEnabled() const
 {
     return m_ipSplitTunnelingController->isSplitTunnelingEnabled();
+}
+
+bool IpSplitTunnelingUiController::hasManagedBypassSites() const
+{
+    return m_ipSplitTunnelingController->hasManagedBypassSites();
+}
+
+bool IpSplitTunnelingUiController::isManagedBypassSite(const QString &hostname) const
+{
+    return m_ipSplitTunnelingController->isManagedBypassSite(hostname);
 }
 
 void IpSplitTunnelingUiController::updateModel()

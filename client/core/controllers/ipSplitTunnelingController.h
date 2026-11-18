@@ -9,6 +9,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QHostInfo>
+#include <QVariantMap>
 
 #include "core/utils/errorCodes.h"
 #include "core/utils/routeModes.h"
@@ -34,6 +35,8 @@ public:
     RouteMode getRouteMode() const;
     bool isSplitTunnelingEnabled() const;
     QVector<QPair<QString, QStringList>> getCurrentSites() const;
+    bool isManagedBypassSite(const QString &hostname) const;
+    bool hasManagedBypassSites() const;
 
     bool importSitesFromJson(const QByteArray& jsonData, bool replaceExisting, QString &errorMessage);
     bool importManagedBypassPolicy(const QByteArray& jsonData, QString &errorMessage);
@@ -49,10 +52,13 @@ private:
     bool validateHostname(const QString &hostname) const;
     void processSiteAfterResolve(const QString &hostname, const QStringList &ips);
     void processSite(const QString &hostname, const QStringList &ips);
+    void rebuildBypassSites();
 
     SecureAppSettingsRepository* m_appSettingsRepository;
     RouteMode m_currentRouteMode;
     QVector<QPair<QString, QStringList>> m_sites;
+    QVariantMap m_manualBypassSites;
+    QStringList m_managedBypassSites;
 };
 
 #endif // IPSPLITTUNNELINGCONTROLLER_H

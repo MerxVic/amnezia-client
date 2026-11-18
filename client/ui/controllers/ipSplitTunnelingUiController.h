@@ -19,6 +19,7 @@ class IpSplitTunnelingUiController : public QObject
     Q_PROPERTY(bool isSplitTunnelingEnabled READ isSplitTunnelingEnabled NOTIFY isSplitTunnelingEnabledChanged)
     Q_PROPERTY(QString managedPolicyUrl READ managedPolicyUrl NOTIFY managedPolicyUrlChanged)
     Q_PROPERTY(QString managedPolicyWarning READ managedPolicyWarning NOTIFY managedPolicyWarningChanged)
+    Q_PROPERTY(bool hasManagedBypassSites READ hasManagedBypassSites NOTIFY managedPolicyChanged)
 
 public:
     explicit IpSplitTunnelingUiController(IpSplitTunnelingController* ipSplitTunnelingController,
@@ -27,6 +28,8 @@ public:
                                          QObject *parent = nullptr);
     QString managedPolicyUrl() const { return m_managedPolicyUrl; }
     QString managedPolicyWarning() const { return m_managedPolicyWarning; }
+    bool hasManagedBypassSites() const;
+    Q_INVOKABLE bool isManagedBypassSite(const QString &hostname) const;
 
 public slots:
     void addSite(QString hostname);
@@ -49,6 +52,7 @@ signals:
     void isSplitTunnelingEnabledChanged();
     void managedPolicyUrlChanged();
     void managedPolicyWarningChanged();
+    void managedPolicyChanged();
     void errorOccurred(const QString &errorMessage);
     void finished(const QString &message);
     void saveFile(const QString &fileName, const QString &data);

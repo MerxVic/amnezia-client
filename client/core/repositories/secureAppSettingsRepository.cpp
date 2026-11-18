@@ -118,6 +118,33 @@ QVariantMap SecureAppSettingsRepository::vpnSites(RouteMode mode) const
     return value("Conf/" + routeModeString(mode)).toMap();
 }
 
+bool SecureAppSettingsRepository::hasSeparatedBypassSites() const
+{
+    return value("Conf/bypassListsSeparated", false).toBool();
+}
+
+QVariantMap SecureAppSettingsRepository::manualBypassSites() const
+{
+    return value("Conf/manualBypassSites").toMap();
+}
+
+void SecureAppSettingsRepository::setManualBypassSites(const QVariantMap &sites)
+{
+    setValue("Conf/manualBypassSites", sites);
+    setValue("Conf/bypassListsSeparated", true);
+}
+
+QStringList SecureAppSettingsRepository::managedBypassSites() const
+{
+    return value("Conf/managedBypassSites").toStringList();
+}
+
+void SecureAppSettingsRepository::setManagedBypassSites(const QStringList &sites)
+{
+    setValue("Conf/managedBypassSites", sites);
+    setValue("Conf/bypassListsSeparated", true);
+}
+
 QStringList SecureAppSettingsRepository::siteIpList(const QVariant &value)
 {
     // QVariant::toStringList() handles both a QStringList/QVariantList and a single QString
