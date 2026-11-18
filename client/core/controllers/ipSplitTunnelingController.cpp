@@ -278,19 +278,12 @@ bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jso
     }
     QJsonParseError parseError;
     const QJsonDocument document = QJsonDocument::fromJson(jsonData, &parseError);
-    if (parseError.error != QJsonParseError::NoError || !document.isObject()) {
+    if (parseError.error != QJsonParseError::NoError || !document.isArray()) {
         errorMessage = tr("Invalid bypass list JSON");
         return false;
     }
-    const QJsonObject policy = document.object();
-    if (policy.value("version").toInt(-1) != 1 ||
-        !policy.value("domains").isArray() || !policy.value("cidrs").isArray()) {
-        errorMessage = tr("Unsupported bypass list format");
-        return false;
-    }
-    const QJsonArray domains = policy.value("domains").toArray();
-    const QJsonArray cidrs = policy.value("cidrs").toArray();
-    if (domains.size() + cidrs.size() > 2048) {
+    const QJsonArray policy = document.array();
+    if (policy.size() > 2048) {
         errorMessage = tr("The bypass list has too many entries");
         return false;
     }
@@ -299,36 +292,29 @@ bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jso
         QStringLiteral("^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"));
     QStringList entries;
     QSet<QString> seen;
-    for (const QJsonValue &value : domains) {
-        if (!value.isString()) {
-            errorMessage = tr("Invalid domain in bypass list");
+    for (const QJsonValue &item : policy) {
+        if (!item.isObject()) {
+            errorMessage = tr("Invalid bypass list entry");
             return false;
         }
-        const QString domain = value.toString().trimmed().toLower();
-        if (!domainPattern.match(domain).hasMatch()) {
-            errorMessage = tr("Invalid domain in bypass list");
+        const QJsonObject record = item.toObject();
+        if (!record.value("hostname").isString() ||
+            (record.contains("ip") &&
+             (!record.value("ip").isString() || !record.value("ip").toString().isEmpty()))) {
+            errorMessage = tr("Invalid bypass list entry");
             return false;
         }
-        if (!seen.contains(domain)) {
-            seen.insert(domain);
-            entries.append(domain);
-        }
-    }
-    for (const QJsonValue &value : cidrs) {
-        if (!value.isString()) {
-            errorMessage = tr("Invalid IP range in bypass list");
+        const QString entry = record.value("hostname").toString().trimmed().toLower();
+        const auto subnet = QHostAddress::parseSubnet(entry);
+        const bool validIpv4 = subnet.first.protocol() == QAbstractSocket::IPv4Protocol &&
+                               subnet.second > 0 && subnet.second <= 32;
+        if (!validIpv4 && !domainPattern.match(entry).hasMatch()) {
+            errorMessage = tr("Invalid bypass list address");
             return false;
         }
-        const QString cidr = value.toString().trimmed();
-        const auto subnet = QHostAddress::parseSubnet(cidr);
-        if (subnet.first.protocol() != QAbstractSocket::IPv4Protocol ||
-            subnet.second < 0 || subnet.second > 32 || subnet.second == 0) {
-            errorMessage = tr("Invalid IP range in bypass list");
-            return false;
-        }
-        if (!seen.contains(cidr)) {
-            seen.insert(cidr);
-            entries.append(cidr);
+        if (!seen.contains(entry)) {
+            seen.insert(entry);
+            entries.append(entry);
         }
     }
 

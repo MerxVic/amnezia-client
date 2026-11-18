@@ -32,10 +32,12 @@ failover, reconnect, tunnel shutdown, and visible exit IP.
 
 ## Managed direct routes
 
-The client fetches a versioned JSON document over HTTPS from the panel:
+The existing panel publishes an Amnezia-compatible JSON document over HTTPS
+at `/downloads/ru-bypass-ip-list.json` on the primary, backup, and emergency
+panel addresses. It is refreshed on the server once per hour:
 
 ```json
-{"version":1,"domains":["example.org"],"cidrs":["192.0.2.0/24"]}
+[{"hostname":"example.org","ip":""},{"hostname":"192.0.2.0/24","ip":""}]
 ```
 
 These entries mean **bypass the VPN on the device**. They are independent of
@@ -48,14 +50,15 @@ can affect unrelated domains. IPv6 needs a separate verified implementation.
 
 The first parser is `IpSplitTunnelingController::importManagedBypassPolicy`.
 It validates a bounded JSON response and maps it to the upstream direct-route
-mode. The transport, token provisioning, periodic refresh, and UI are separate
-work; the parser alone does not make remote updates automatic.
+mode. Its first UI entry imports a downloaded file; authenticated profile
+provisioning, periodic refresh, and separate managed/manual storage remain to
+be implemented. The public list does not require a device token.
 
 ## Delivery gates
 
-1. Add panel endpoints for device enrollment, own-profile download, managed
-   bypass policy, and client-safe status. Test role enforcement and revocation.
-2. Wire authenticated policy download and refresh into the client. Preserve
+1. Add panel endpoints for device enrollment, own-profile download, and
+   client-safe status. Test role enforcement and revocation.
+2. Wire policy download and refresh into the client. Preserve
    manual rules separately from the managed list. Apply updates only after the
    active VPN tunnel can safely reload routes or during controlled reconnect.
 3. Add the two role-specific interfaces, including Android TV remote navigation.
