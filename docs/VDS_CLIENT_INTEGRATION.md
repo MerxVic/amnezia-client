@@ -55,6 +55,11 @@ list directly from a supplied HTTPS panel URL. Authenticated profile
 provisioning, periodic refresh, and separate managed/manual storage remain to
 be implemented. The public list does not require a device token.
 
+The connection-key screen now accepts a panel URL and client account. It
+downloads the account's own `.vpn` profile into the existing import review
+screen. The password is not persisted; the session cookie remains in memory.
+Administrator login and its separate controls are not implemented yet.
+
 ## Delivery gates
 
 1. Add panel endpoints for device enrollment, own-profile download, and

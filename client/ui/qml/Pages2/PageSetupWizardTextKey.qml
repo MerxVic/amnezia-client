@@ -53,6 +53,62 @@ PageType {
                     textField.paste()
                 }
             }
+
+            ButtonType {
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                text: qsTr("Get my profile from panel")
+                onClicked: panelLoginDialog.open()
+            }
+        }
+    }
+
+    Connections {
+        target: VdsPanelClient
+        function onProfileReady(profile) {
+            if (ImportController.extractConfigFromData(profile)) {
+                PageController.goToPage(PageEnum.PageSetupWizardViewConfig)
+            }
+        }
+        function onErrorOccurred(message) {
+            PageController.showErrorMessage(message)
+        }
+    }
+
+    Dialog {
+        id: panelLoginDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 32, 440)
+        modal: true
+        title: qsTr("VPN panel")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            VdsPanelClient.fetchOwnProfile(panelUrl.text, panelUsername.text, panelPassword.text)
+            panelPassword.text = ""
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            TextField {
+                id: panelUrl
+                Layout.fillWidth: true
+                placeholderText: qsTr("https://panel.example:8443/")
+                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+            }
+            TextField {
+                id: panelUsername
+                Layout.fillWidth: true
+                placeholderText: qsTr("Username")
+                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+            }
+            TextField {
+                id: panelPassword
+                Layout.fillWidth: true
+                placeholderText: qsTr("Password")
+                echoMode: TextInput.Password
+            }
         }
     }
 

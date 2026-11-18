@@ -12,6 +12,7 @@
 #include "logger.h"
 #include "secureQSettings.h"
 #include "core/utils/appUiConfig.h"
+#include "ui/controllers/vdsPanelClient.h"
 
 #if defined(Q_OS_ANDROID)
     #include "core/utils/installedAppsImageProvider.h"
@@ -203,6 +204,7 @@ void CoreController::initControllers()
 
     m_importController = new ImportUiController(m_importCoreController, this);
     setQmlContextProperty("ImportController", m_importController);
+    setQmlContextProperty("VdsPanelClient", new VdsPanelClient(this));
 
     m_exportUiController = new ExportUiController(m_exportController, this);
     setQmlContextProperty("ExportController", m_exportUiController);
