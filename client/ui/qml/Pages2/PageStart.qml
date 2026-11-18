@@ -325,18 +325,19 @@ PageType {
         TabBarButtonType {
             id: shareTabButton
 
+            property bool hasWriteAccess: ServersUiController.hasServerWithWriteAccess()
+
             Connections {
                 target: ServersModel
 
                 function onModelReset() {
                     if (!SettingsController.isOnTv()) {
-                        var hasServerWithWriteAccess = ServersUiController.hasServerWithWriteAccess()
-                        shareTabButton.visible = hasServerWithWriteAccess
+                        shareTabButton.hasWriteAccess = ServersUiController.hasServerWithWriteAccess()
                     }
                 }
             }
 
-            visible: !SettingsController.isOnTv() && ServersUiController.hasServerWithWriteAccess()
+            visible: VdsPanelClient.role !== "client" && !SettingsController.isOnTv() && hasWriteAccess
 
             text: qsTr("Share")
             icon.source: "qrc:/images/controls/share-2.svg"
@@ -349,6 +350,8 @@ PageType {
         TabBarButtonType {
             id: settingsTabButton
 
+            visible: VdsPanelClient.role !== "client"
+
             text: qsTr("Settings")
             icon.source: "qrc:/images/controls/settings.svg"
             showBadge: ServersUiController.hasServersFromGatewayApi && NewsModel.hasUnread && SettingsController.isNewsNotificationsEnabled()
@@ -360,6 +363,8 @@ PageType {
 
         TabBarButtonType {
             id: plusTabButton
+
+            visible: VdsPanelClient.role !== "client"
 
             text: qsTr("Add")
             icon.source: "qrc:/images/controls/plus.svg"

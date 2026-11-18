@@ -271,6 +271,7 @@ bool IpSplitTunnelingController::importSitesFromJson(const QByteArray& jsonData,
 
 bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jsonData, QString &errorMessage)
 {
+    errorMessage.clear();
     // Validate the whole response before replacing any local routing settings.
     if (jsonData.size() > 256 * 1024) {
         errorMessage = tr("The bypass list is too large");
@@ -292,6 +293,7 @@ bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jso
         QStringLiteral("^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$"));
     QStringList entries;
     QSet<QString> seen;
+    int unsupportedWildcards = 0;
     for (const QJsonValue &item : policy) {
         if (!item.isObject()) {
             errorMessage = tr("Invalid bypass list entry");
@@ -305,6 +307,14 @@ bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jso
             return false;
         }
         const QString entry = record.value("hostname").toString().trimmed().toLower();
+        if (entry.startsWith(QLatin1String("*."))) {
+            if (!domainPattern.match(entry.mid(2)).hasMatch()) {
+                errorMessage = tr("Invalid wildcard in bypass list");
+                return false;
+            }
+            ++unsupportedWildcards;
+            continue;
+        }
         const auto subnet = QHostAddress::parseSubnet(entry);
         const bool validIpv4 = subnet.first.protocol() == QAbstractSocket::IPv4Protocol &&
                                subnet.second > 0 && subnet.second <= 32;
@@ -324,6 +334,10 @@ bool IpSplitTunnelingController::importManagedBypassPolicy(const QByteArray& jso
         addSite(entry); // Existing resolver expands domains to IPv4 routes.
     }
     toggleSplitTunneling(true);
+    if (unsupportedWildcards) {
+        errorMessage = tr("%1 wildcard domains need domain-aware routing and were skipped")
+                           .arg(unsupportedWildcards);
+    }
     return true;
 }
 

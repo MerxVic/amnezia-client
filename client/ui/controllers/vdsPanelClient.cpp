@@ -5,6 +5,7 @@
 #include <QNetworkCookieJar>
 #include <QNetworkReply>
 #include <QNetworkRequest>
+#include <QSettings>
 #include <QUrlQuery>
 
 namespace {
@@ -28,6 +29,12 @@ VdsPanelClient::VdsPanelClient(QObject *parent)
     : QObject(parent)
 {
     m_network.setCookieJar(new QNetworkCookieJar(&m_network));
+    const QString lastRole = QSettings().value(QStringLiteral("VDS/lastPanelRole")).toString();
+    if (lastRole == QLatin1String("client") || lastRole == QLatin1String("admin")) {
+        m_role = lastRole;
+    }
+    m_statusTimer.setInterval(60000);
+    connect(&m_statusTimer, &QTimer::timeout, this, &VdsPanelClient::fetchStatus);
 }
 
 QUrl VdsPanelClient::endpoint(const QString &path) const
@@ -55,6 +62,13 @@ void VdsPanelClient::fetchOwnProfile(const QString &panelUrl, const QString &use
         return;
     }
     m_busy = true;
+    if (m_signedIn) {
+        m_signedIn = false;
+        emit signedInChanged();
+    }
+    m_statusTimer.stop();
+    m_statusText.clear();
+    emit statusChanged();
     m_baseUrl = url;
     QUrlQuery form;
     form.addQueryItem(QStringLiteral("username"), username);
@@ -84,11 +98,41 @@ void VdsPanelClient::fetchIdentity()
         const QJsonDocument document = QJsonDocument::fromJson(body);
         if (!ok || !document.isObject() ||
             document.object().value("role").toString() != QLatin1String("client")) {
-            fail(tr("This account is not assigned a client VPN profile"));
+            fetchAdminIdentity();
             return;
         }
+        m_role = QStringLiteral("client");
+        QSettings().setValue(QStringLiteral("VDS/lastPanelRole"), m_role);
+        emit roleChanged();
         emit roleReady(QStringLiteral("client"));
+        m_signedIn = true;
+        emit signedInChanged();
+        m_statusTimer.start();
         fetchProfile();
+    });
+}
+
+void VdsPanelClient::fetchAdminIdentity()
+{
+    QNetworkReply *reply = m_network.get(panelRequest(endpoint(QStringLiteral("/api/config"))));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        const bool ok = successful(reply, 200);
+        const QByteArray body = reply->read(4097);
+        reply->deleteLater();
+        const QJsonDocument document = QJsonDocument::fromJson(body);
+        const QString role = document.isObject() ? document.object().value("role").toString() : QString();
+        if (!ok || body.size() > 4096 || (role != QLatin1String("admin") &&
+                                           role != QLatin1String("owner"))) {
+            fail(tr("This account has no VPN panel access"));
+            return;
+        }
+        m_role = QStringLiteral("admin");
+        QSettings().setValue(QStringLiteral("VDS/lastPanelRole"), m_role);
+        m_busy = false;
+        m_signedIn = true;
+        emit roleChanged();
+        emit signedInChanged();
+        emit roleReady(m_role);
     });
 }
 
@@ -105,5 +149,41 @@ void VdsPanelClient::fetchProfile()
         }
         m_busy = false;
         emit profileReady(QString::fromUtf8(body));
+        fetchStatus();
+    });
+}
+
+void VdsPanelClient::fetchStatus()
+{
+    if (!m_signedIn || m_statusActive) return;
+    m_statusActive = true;
+    QNetworkReply *reply = m_network.get(panelRequest(endpoint(QStringLiteral("/api/client/status"))));
+    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+        m_statusActive = false;
+        const bool ok = successful(reply, 200);
+        const QByteArray body = reply->read(8193);
+        reply->deleteLater();
+        const QJsonDocument document = QJsonDocument::fromJson(body);
+        if (!ok || body.size() > 8192 || !document.isObject()) {
+            m_statusText = tr("Server status unavailable");
+            emit statusChanged();
+            return;
+        }
+        const QJsonObject status = document.object();
+        if (status.value("stale").toBool(true)) {
+            m_statusText = tr("No recent server status");
+        } else {
+            const QJsonObject awg = status.value("awg").toObject();
+            const QJsonObject vless = status.value("vless").toObject();
+            int awgReady = 0;
+            int vlessReady = 0;
+            for (const QString &name : {QStringLiteral("aeza"), QStringLiteral("lands"),
+                                        QStringLiteral("gefast")}) {
+                awgReady += awg.value(name).toBool() ? 1 : 0;
+                vlessReady += vless.value(name).toBool() ? 1 : 0;
+            }
+            m_statusText = tr("AWG: %1/3, VLESS: %2/3").arg(awgReady).arg(vlessReady);
+        }
+        emit statusChanged();
     });
 }

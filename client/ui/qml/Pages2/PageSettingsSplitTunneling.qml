@@ -166,6 +166,16 @@ PageType {
                 text: root.routeModes[modeSelector.currentIndex].name
                 color: AmneziaStyle.color.textSecondary
             }
+
+            BodyTextType {
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Layout.bottomMargin: 12
+                visible: IpSplitTunnelingController.managedPolicyWarning !== ""
+                text: IpSplitTunnelingController.managedPolicyWarning
+                color: AmneziaStyle.color.textSecondary
+            }
         }
 
         delegate: Item {
@@ -232,6 +242,7 @@ PageType {
 
             onClicked: {
                 moreActionsMenu.close()
+                bypassUrlField.text = IpSplitTunnelingController.managedPolicyUrl
                 bypassUrlDialog.open()
             }
         }
@@ -339,7 +350,7 @@ PageType {
         standardButtons: Dialog.Ok | Dialog.Cancel
         onAccepted: {
             Dialogs.askQuestion(qsTr("Replace direct-route list?"),
-                                qsTr("The downloaded list will replace the current direct-route list."),
+                                qsTr("The downloaded list will replace the current direct-route list and refresh hourly."),
                                 qsTr("Continue"), qsTr("Cancel"),
                                 function() { IpSplitTunnelingController.downloadManagedBypassPolicy(bypassUrlField.text) },
                                 function() {})

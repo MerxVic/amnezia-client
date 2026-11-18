@@ -4,6 +4,7 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QUrl>
+#include <QSettings>
 #include <memory>
 
 #include "systemController.h"
@@ -12,12 +13,30 @@
 #include "core/utils/commonStructs.h"
 
 IpSplitTunnelingUiController::IpSplitTunnelingUiController(IpSplitTunnelingController* ipSplitTunnelingController,
-                                                          IpSplitTunnelingModel* ipSplitTunnelingModel, QObject *parent)
+                                                          IpSplitTunnelingModel* ipSplitTunnelingModel,
+                                                          ConnectionController* connectionController,
+                                                          QObject *parent)
     : QObject(parent),
       m_ipSplitTunnelingController(ipSplitTunnelingController),
-      m_ipSplitTunnelingModel(ipSplitTunnelingModel)
+      m_ipSplitTunnelingModel(ipSplitTunnelingModel),
+      m_connectionController(connectionController)
 {
     m_ipSplitTunnelingModel->updateModel(m_ipSplitTunnelingController->getCurrentSites());
+    m_managedPolicyUrl = QSettings().value(QStringLiteral("VDS/managedBypassUrl")).toString();
+    m_policyTimer.setInterval(60 * 60 * 1000);
+    connect(&m_policyTimer, &QTimer::timeout, this, [this]() {
+        downloadManagedBypassPolicy(m_managedPolicyUrl);
+    });
+    connect(m_connectionController, &ConnectionController::connectionStateChanged,
+            this, [this](Vpn::ConnectionState state) {
+                if (state == Vpn::ConnectionState::Disconnected) applyPendingPolicy();
+            });
+    if (!m_managedPolicyUrl.isEmpty()) {
+        m_policyTimer.start();
+        QTimer::singleShot(0, this, [this]() {
+            downloadManagedBypassPolicy(m_managedPolicyUrl);
+        });
+    }
 }
 
 void IpSplitTunnelingUiController::addSite(QString hostname)
@@ -67,10 +86,13 @@ void IpSplitTunnelingUiController::importManagedBypassPolicy(const QString &file
     }
     QString errorMessage;
     if (m_ipSplitTunnelingController->importManagedBypassPolicy(jsonData, errorMessage)) {
+        m_managedPolicyWarning = errorMessage;
+        emit managedPolicyWarningChanged();
         updateModel();
         emit routeModeChanged();
         emit isSplitTunnelingEnabledChanged();
-        emit finished(tr("Direct-route list imported"));
+        emit finished(tr("Direct-route list imported") +
+                      (errorMessage.isEmpty() ? QString() : QStringLiteral(". ") + errorMessage));
     } else {
         emit errorOccurred(errorMessage);
     }
@@ -106,21 +128,46 @@ void IpSplitTunnelingUiController::downloadManagedBypassPolicy(const QString &ur
         if (!*tooLarge) content->append(reply->readAll());
         const bool received = !*tooLarge && reply->error() == QNetworkReply::NoError &&
                               reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt() == 200;
+        const QUrl responseUrl = reply->url();
         reply->deleteLater();
         if (!received) {
             emit errorOccurred(tr("Could not download the bypass list"));
             return;
         }
-        QString errorMessage;
-        if (!m_ipSplitTunnelingController->importManagedBypassPolicy(*content, errorMessage)) {
-            emit errorOccurred(errorMessage);
-            return;
+        m_pendingPolicy = *content;
+        m_pendingPolicyUrl = responseUrl;
+        if (m_connectionController->connectionState() == Vpn::ConnectionState::Disconnected) {
+            applyPendingPolicy();
+        } else {
+            emit finished(tr("Direct-route list will update after VPN disconnects"));
         }
-        updateModel();
-        emit routeModeChanged();
-        emit isSplitTunnelingEnabledChanged();
-        emit finished(tr("Direct-route list updated"));
     });
+}
+
+void IpSplitTunnelingUiController::applyPendingPolicy()
+{
+    if (m_pendingPolicy.isEmpty()) return;
+    QString errorMessage;
+    if (!m_ipSplitTunnelingController->importManagedBypassPolicy(m_pendingPolicy, errorMessage)) {
+        m_pendingPolicy.clear();
+        emit errorOccurred(errorMessage);
+        return;
+    }
+    m_pendingPolicy.clear();
+    m_managedPolicyWarning = errorMessage;
+    emit managedPolicyWarningChanged();
+    const QString acceptedUrl = m_pendingPolicyUrl.toString();
+    if (m_managedPolicyUrl != acceptedUrl) {
+        m_managedPolicyUrl = acceptedUrl;
+        QSettings().setValue(QStringLiteral("VDS/managedBypassUrl"), acceptedUrl);
+        emit managedPolicyUrlChanged();
+    }
+    m_policyTimer.start();
+    updateModel();
+    emit routeModeChanged();
+    emit isSplitTunnelingEnabledChanged();
+    emit finished(tr("Direct-route list updated") +
+                  (errorMessage.isEmpty() ? QString() : QStringLiteral(". ") + errorMessage));
 }
 
 void IpSplitTunnelingUiController::exportSites(const QString &fileName)

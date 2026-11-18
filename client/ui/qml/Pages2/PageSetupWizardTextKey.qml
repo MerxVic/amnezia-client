@@ -61,6 +61,15 @@ PageType {
                 text: qsTr("Get my profile from panel")
                 onClicked: panelLoginDialog.open()
             }
+
+            ButtonType {
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                visible: VdsPanelClient.role === "admin" && VdsPanelClient.panelUrl.toString() !== ""
+                text: qsTr("Open administration panel")
+                onClicked: Qt.openUrlExternally(VdsPanelClient.panelUrl)
+            }
         }
     }
 
@@ -73,6 +82,15 @@ PageType {
         }
         function onErrorOccurred(message) {
             PageController.showErrorMessage(message)
+        }
+        function onRoleReady(role) {
+            if (role === "client") {
+                var panelOrigin = VdsPanelClient.panelUrl.toString().replace(/\/$/, "")
+                IpSplitTunnelingController.downloadManagedBypassPolicy(
+                    panelOrigin + "/downloads/ru-bypass-ip-list.json")
+            } else if (role === "admin") {
+                PageController.showNotificationMessage(qsTr("Administrator access is ready"))
+            }
         }
     }
 

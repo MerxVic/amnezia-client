@@ -16,10 +16,10 @@ No server address, profile, access token, or private key belongs in this repo.
 | Create, rotate, revoke, or export other profiles | No | Yes |
 | Change server routes or restart a server | No | Yes, with a separate confirmation |
 
-The panel must enforce these permissions on every request. Client tokens must
-be bound to one device/profile and be independently revocable. The application
-stores credentials in platform protected storage and never places them in a
-URL, log, crash report, or VPN profile export.
+The panel must enforce these permissions on every request. Client accounts
+are bound to one profile and must be independently revocable. The application
+does not store the panel password; it keeps the session cookie in memory and
+never places credentials in a URL, log, crash report, or VPN profile export.
 
 ## Connection types
 
@@ -47,18 +47,36 @@ entire response, keeps the last accepted version on failed refresh, and applies
 new rules before the next connection. An empty list is valid. Domain entries
 must be resolved again when their IP addresses change; shared IP addresses
 can affect unrelated domains. IPv6 needs a separate verified implementation.
+The current server list also contains `*.domain` entries. The upstream
+IP-route mechanism cannot cover every subdomain from such a rule. This fork
+skips those entries with a visible warning while applying exact domains and
+IPv4 entries; domain-aware matching remains required for full wildcard support.
 
 The first parser is `IpSplitTunnelingController::importManagedBypassPolicy`.
 It validates a bounded JSON response and maps it to the upstream direct-route
 mode. The settings screen can import a downloaded file or fetch the public
-list directly from a supplied HTTPS panel URL. Authenticated profile
-provisioning, periodic refresh, and separate managed/manual storage remain to
-be implemented. The public list does not require a device token.
+list directly from a supplied HTTPS panel URL. After the first successful
+download, the app checks that URL hourly and applies new rules when the VPN is
+disconnected. At this stage, each accepted update replaces the local direct
+route list; separate managed/manual storage remains to be implemented. The
+public list does not require a device token.
 
 The connection-key screen now accepts a panel URL and client account. It
 downloads the account's own `.vpn` profile into the existing import review
 screen. The password is not persisted; the session cookie remains in memory.
-Administrator login and its separate controls are not implemented yet.
+After login, the home screen shows a reduced AWG/VLESS availability summary
+from `/api/client/status`, refreshed while the application is running.
+Client sign-in also starts the direct-route list download from that panel's
+public HTTPS endpoint; later refreshes use the saved URL.
+Client mode shows the connection button and basic availability; it hides the
+settings, sharing, add-profile, server, and split-tunneling controls. These UI
+restrictions supplement the panel's server-side authorization. Administrator
+accounts use the existing panel login and `/api/config` role check. The app
+offers a link to the full administration panel; the system browser has its own
+session and requires a separate login. Native administration controls remain
+to be implemented. The last selected UI role is stored locally so that a
+client device still opens in its simple mode after an app restart; the panel
+rechecks access for every authenticated request.
 
 ## Delivery gates
 
