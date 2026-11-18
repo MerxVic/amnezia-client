@@ -62,6 +62,8 @@ void VdsPanelClient::fetchOwnProfile(const QString &panelUrl, const QString &use
         return;
     }
     m_busy = true;
+    ++m_sessionRevision;
+    m_statusActive = false;
     if (m_signedIn) {
         m_signedIn = false;
         emit signedInChanged();
@@ -157,12 +159,23 @@ void VdsPanelClient::fetchStatus()
 {
     if (!m_signedIn || m_statusActive) return;
     m_statusActive = true;
+    const quint64 sessionRevision = m_sessionRevision;
     QNetworkReply *reply = m_network.get(panelRequest(endpoint(QStringLiteral("/api/client/status"))));
-    connect(reply, &QNetworkReply::finished, this, [this, reply]() {
+    connect(reply, &QNetworkReply::finished, this, [this, reply, sessionRevision]() {
+        if (sessionRevision != m_sessionRevision) {
+            reply->deleteLater();
+            return;
+        }
         m_statusActive = false;
+        const int statusCode = reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt();
         const bool ok = successful(reply, 200);
         const QByteArray body = reply->read(8193);
         reply->deleteLater();
+        if (statusCode == 401 || statusCode == 403) {
+            m_signedIn = false;
+            m_statusTimer.stop();
+            emit signedInChanged();
+        }
         const QJsonDocument document = QJsonDocument::fromJson(body);
         if (!ok || body.size() > 8192 || !document.isObject()) {
             m_statusText = tr("Server status unavailable");

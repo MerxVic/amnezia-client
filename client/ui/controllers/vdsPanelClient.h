@@ -5,6 +5,7 @@
 #include <QNetworkAccessManager>
 #include <QTimer>
 #include <QUrl>
+#include <QtGlobal>
 
 class VdsPanelClient : public QObject
 {
@@ -40,6 +41,7 @@ private:
     bool m_busy = false;
     bool m_signedIn = false;
     bool m_statusActive = false;
+    quint64 m_sessionRevision = 0;
     QString m_role;
     QString m_statusText;
     QTimer m_statusTimer;

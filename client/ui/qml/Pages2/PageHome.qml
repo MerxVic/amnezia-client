@@ -189,9 +189,17 @@ PageType {
             HomeInfoButton {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.maximumWidth: parent.width - 32
-                visible: VdsPanelClient.signedIn && VdsPanelClient.role === "client"
-                text: VdsPanelClient.statusText || qsTr("Check server availability")
-                onClicked: VdsPanelClient.fetchStatus()
+                visible: VdsPanelClient.role === "client"
+                text: VdsPanelClient.signedIn
+                      ? (VdsPanelClient.statusText || qsTr("Check server availability"))
+                      : qsTr("Sign in to see server status")
+                onClicked: {
+                    if (VdsPanelClient.signedIn) {
+                        VdsPanelClient.fetchStatus()
+                    } else {
+                        PageController.goToPage(PageEnum.PageSetupWizardTextKey)
+                    }
+                }
             }
 
             HomeInfoButton {
@@ -205,7 +213,7 @@ PageType {
             HomeInfoButton {
                 Layout.alignment: Qt.AlignHCenter
                 Layout.maximumWidth: parent.width - 32
-                visible: VdsPanelClient.role === "client"
+                visible: VdsPanelClient.role === "client" && VdsPanelClient.signedIn
                 text: qsTr("Switch panel account")
                 onClicked: PageController.goToPage(PageEnum.PageSetupWizardTextKey)
             }

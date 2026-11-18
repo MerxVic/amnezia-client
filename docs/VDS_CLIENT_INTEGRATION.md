@@ -79,7 +79,9 @@ offers a link to the full administration panel; the system browser has its own
 session and requires a separate login. Native administration controls remain
 to be implemented. The last selected UI role is stored locally so that a
 client device still opens in its simple mode after an app restart; the panel
-rechecks access for every authenticated request.
+rechecks access for every authenticated request. The session cookie is not
+restored after restart. The client screen prompts for sign-in when a status
+session is missing or rejected by the panel.
 
 ## Delivery gates
 
