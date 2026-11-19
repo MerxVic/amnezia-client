@@ -1,4 +1,3 @@
-/Users/vopekunov/.zprofile:2: no such file or directory: /opt/homebrew/bin/brew
 import Foundation
 
 private func cxxString(_ value: String) -> std.string {
