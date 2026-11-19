@@ -53,6 +53,80 @@ PageType {
                     textField.paste()
                 }
             }
+
+            ButtonType {
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                text: qsTr("Get my profile from panel")
+                onClicked: panelLoginDialog.open()
+            }
+
+            ButtonType {
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                visible: VdsPanelClient.role === "admin" && VdsPanelClient.panelUrl.toString() !== ""
+                text: qsTr("Open administration panel")
+                onClicked: Qt.openUrlExternally(VdsPanelClient.panelUrl)
+            }
+        }
+    }
+
+    Connections {
+        target: VdsPanelClient
+        function onProfileReady(profile) {
+            if (ImportController.extractConfigFromData(profile)) {
+                PageController.goToPage(PageEnum.PageSetupWizardViewConfig)
+            }
+        }
+        function onErrorOccurred(message) {
+            PageController.showErrorMessage(message)
+        }
+        function onRoleReady(role) {
+            if (role === "client") {
+                var panelOrigin = VdsPanelClient.panelUrl.toString().replace(/\/$/, "")
+                IpSplitTunnelingController.downloadManagedBypassPolicy(
+                    panelOrigin + "/downloads/ru-bypass-ip-list.json")
+            } else if (role === "admin") {
+                PageController.showNotificationMessage(qsTr("Administrator access is ready"))
+            }
+        }
+    }
+
+    Dialog {
+        id: panelLoginDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 32, 440)
+        modal: true
+        title: qsTr("VPN panel")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            VdsPanelClient.fetchOwnProfile(panelUrl.text, panelUsername.text, panelPassword.text)
+            panelPassword.text = ""
+        }
+
+        contentItem: ColumnLayout {
+            spacing: 8
+            TextField {
+                id: panelUrl
+                Layout.fillWidth: true
+                placeholderText: qsTr("https://panel.example:8443/")
+                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+            }
+            TextField {
+                id: panelUsername
+                Layout.fillWidth: true
+                placeholderText: qsTr("Username")
+                inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
+            }
+            TextField {
+                id: panelPassword
+                Layout.fillWidth: true
+                placeholderText: qsTr("Password")
+                echoMode: TextInput.Password
+            }
         }
     }
 

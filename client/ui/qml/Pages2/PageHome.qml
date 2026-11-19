@@ -116,7 +116,7 @@ PageType {
 
                 Layout.alignment: Qt.AlignHCenter
 
-                visible: isLoggingEnabled ? true : false
+                visible: VdsPanelClient.role !== "client" && isLoggingEnabled
                 largeText: true
                 text: qsTr("Logging enabled")
 
@@ -132,7 +132,7 @@ PageType {
 
                 Layout.alignment: Qt.AlignHCenter
 
-                visible: SettingsController.isDevModeEnabled && isDevGatewayEnabled
+                visible: VdsPanelClient.role !== "client" && SettingsController.isDevModeEnabled && isDevGatewayEnabled
                 largeText: true
                 text: qsTr("Dev gateway enabled")
 
@@ -162,6 +162,8 @@ PageType {
             HomeInfoButton {
                 id: splitTunnelingButton
 
+                visible: VdsPanelClient.role !== "client"
+
                 Layout.alignment: Qt.AlignHCenter
                 Layout.maximumWidth: parent.width - 32
 
@@ -184,6 +186,38 @@ PageType {
                 }
             }
 
+            HomeInfoButton {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.maximumWidth: parent.width - 32
+                visible: VdsPanelClient.role === "client"
+                text: VdsPanelClient.signedIn
+                      ? (VdsPanelClient.statusText || qsTr("Check server availability"))
+                      : qsTr("Sign in to see server status")
+                onClicked: {
+                    if (VdsPanelClient.signedIn) {
+                        VdsPanelClient.fetchStatus()
+                    } else {
+                        PageController.goToPage(PageEnum.PageSetupWizardTextKey)
+                    }
+                }
+            }
+
+            HomeInfoButton {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.maximumWidth: parent.width - 32
+                visible: VdsPanelClient.role === "admin" && VdsPanelClient.signedIn
+                text: qsTr("Open administration panel")
+                onClicked: Qt.openUrlExternally(VdsPanelClient.panelUrl)
+            }
+
+            HomeInfoButton {
+                Layout.alignment: Qt.AlignHCenter
+                Layout.maximumWidth: parent.width - 32
+                visible: VdsPanelClient.role === "client" && VdsPanelClient.signedIn
+                text: qsTr("Switch panel account")
+                onClicked: PageController.goToPage(PageEnum.PageSetupWizardTextKey)
+            }
+
             PromoBanner {
                 id: promoBanner
 
@@ -192,7 +226,7 @@ PageType {
                 Layout.rightMargin: 16
                 Layout.topMargin: 12
 
-                visible: ServersUiController.isAdVisible
+                visible: VdsPanelClient.role !== "client" && ServersUiController.isAdVisible
                 text: ServersUiController.adHeader
                 subtitle: ServersUiController.adDescription
 
@@ -204,11 +238,13 @@ PageType {
     Item {
         id: collapsedBar
 
+        visible: VdsPanelClient.role !== "client"
+
         anchors.left: parent.left
         anchors.right: parent.right
         anchors.bottom: parent.bottom
 
-        height: drawer.contentTopOffset + collapsedSummary.height
+        height: visible ? drawer.contentTopOffset + collapsedSummary.height : 0
 
         Rectangle {
             anchors.fill: parent
@@ -289,6 +325,8 @@ PageType {
 
     SheetType {
         id: drawer
+
+        visible: VdsPanelClient.role !== "client"
 
         bottomY: root.height
         closedY: root.height - collapsedBar.height

@@ -10,6 +10,8 @@
 
 #include "utils/testCoreController.h"
 #include "core/models/serverDescription.h"
+#include "core/controllers/ipSplitTunnelingController.h"
+#include "core/repositories/secureAppSettingsRepository.h"
 #include "secureQSettings.h"
 #include "vpnConnection.h"
 
@@ -122,6 +124,55 @@ private slots:
         m_coreController->m_ipSplitTunnelingUiController->updateModel();
         QVERIFY2(finishedSpy.count() == 6, "finished signal should be emitted");
         QVERIFY2(m_coreController->m_ipSplitTunnelingModel->rowCount() == 0, "IpSplitTunnelingModel should have 0 rows");
+    }
+
+    void testManagedBypassPreservesManualSites()
+    {
+        SecureQSettings settings("AmneziaVPN-Bypass-Test-" + QUuid::createUuid().toString(),
+                                 "amnezia-client", nullptr, false);
+        SecureAppSettingsRepository repository(&settings);
+        repository.addVpnSite(RouteMode::VpnAllExceptSites, "192.0.2.0/24");
+
+        {
+            IpSplitTunnelingController controller(&repository);
+            QString error;
+            QVERIFY(controller.importManagedBypassPolicy(
+                R"([{"hostname":"198.51.100.0/24","ip":""}])", error));
+            QVERIFY(error.isEmpty());
+            QVERIFY(controller.addSite("203.0.113.0/25"));
+            QVERIFY(controller.importManagedBypassPolicy(
+                R"([{"hostname":"198.51.100.128/25","ip":""}])", error));
+
+            const QVariantMap routes = repository.vpnSites(RouteMode::VpnAllExceptSites);
+            QCOMPARE(routes.size(), 3);
+            QVERIFY(routes.contains("192.0.2.0/24"));
+            QVERIFY(routes.contains("203.0.113.0/25"));
+            QVERIFY(routes.contains("198.51.100.128/25"));
+            QVERIFY(!routes.contains("198.51.100.0/24"));
+            QVERIFY(!controller.removeSite("198.51.100.128/25"));
+
+            QVERIFY(controller.importManagedBypassPolicy("[]", error));
+            QCOMPARE(repository.vpnSites(RouteMode::VpnAllExceptSites).size(), 2);
+            QVERIFY(!controller.hasManagedBypassSites());
+            QVERIFY(controller.importManagedBypassPolicy(
+                R"([{"hostname":"198.51.100.128/25","ip":""}])", error));
+
+            QVERIFY(controller.importSitesFromJson(
+                R"([{"hostname":"203.0.113.64/26","ip":""}])", true, error));
+            QCOMPARE(repository.vpnSites(RouteMode::VpnAllExceptSites).size(), 2);
+            QVERIFY(repository.vpnSites(RouteMode::VpnAllExceptSites).contains("203.0.113.64/26"));
+            QVERIFY(repository.vpnSites(RouteMode::VpnAllExceptSites).contains("198.51.100.128/25"));
+
+            controller.removeSites();
+            QCOMPARE(repository.vpnSites(RouteMode::VpnAllExceptSites).size(), 1);
+            QVERIFY(repository.vpnSites(RouteMode::VpnAllExceptSites).contains("198.51.100.128/25"));
+        }
+
+        IpSplitTunnelingController restored(&repository);
+        QVERIFY(restored.hasManagedBypassSites());
+        QVERIFY(restored.isManagedBypassSite("198.51.100.128/25"));
+        QCOMPARE(repository.vpnSites(RouteMode::VpnAllExceptSites).size(), 1);
+        settings.clearSettings();
     }
 };
 

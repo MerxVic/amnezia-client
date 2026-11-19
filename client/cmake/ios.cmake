@@ -1,4 +1,5 @@
 message("Client iOS build")
+option(AMNEZIA_IOS_SIMULATOR_PREVIEW "Build iOS interface without the VPN extension" OFF)
 set(APPLE_PROJECT_VERSION ${CMAKE_PROJECT_VERSION_MAJOR}.${CMAKE_PROJECT_VERSION_MINOR}.${CMAKE_PROJECT_VERSION_PATCH})
 
 enable_language(OBJC)
@@ -80,8 +81,13 @@ set_target_properties(${PROJECT} PROPERTIES
     XCODE_EMBED_FRAMEWORKS_CODE_SIGN_ON_COPY ON
     XCODE_LINK_BUILD_PHASE_MODE KNOWN_LOCATION
     XCODE_ATTRIBUTE_LD_RUNPATH_SEARCH_PATHS "@executable_path/Frameworks"
-    XCODE_EMBED_APP_EXTENSIONS ${CLIENT_IOS_NE_TARGET_NAME}
 )
+
+if(NOT AMNEZIA_IOS_SIMULATOR_PREVIEW)
+    set_target_properties(${PROJECT} PROPERTIES
+        XCODE_EMBED_APP_EXTENSIONS ${CLIENT_IOS_NE_TARGET_NAME}
+    )
+endif()
 
 if(DEPLOY)
     set_target_properties(${PROJECT} PROPERTIES
@@ -147,5 +153,7 @@ set_property(TARGET ${PROJECT} APPEND PROPERTY RESOURCE
     ${CMAKE_CURRENT_SOURCE_DIR}/ios/app/PrivacyInfo.xcprivacy
 )
 
-add_subdirectory(ios/networkextension)
-add_dependencies(${PROJECT} ${CLIENT_IOS_NE_TARGET_NAME})
+if(NOT AMNEZIA_IOS_SIMULATOR_PREVIEW)
+    add_subdirectory(ios/networkextension)
+    add_dependencies(${PROJECT} ${CLIENT_IOS_NE_TARGET_NAME})
+endif()

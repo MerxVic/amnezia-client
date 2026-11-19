@@ -43,6 +43,11 @@ public:
     void removeVpnSite(RouteMode mode, const QString &site);
     void removeAllVpnSites(RouteMode mode);
     QVariantMap vpnSites(RouteMode mode) const;
+    bool hasSeparatedBypassSites() const;
+    QVariantMap manualBypassSites() const;
+    void setManualBypassSites(const QVariantMap &sites);
+    QStringList managedBypassSites() const;
+    void setManagedBypassSites(const QStringList &sites);
 
     // Normalizes a stored vpn site value into a list of IPs.
     // Supports both the legacy format (a single IP string) and the current one (a list of IPs).

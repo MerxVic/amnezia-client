@@ -12,6 +12,7 @@
 #include "logger.h"
 #include "secureQSettings.h"
 #include "core/utils/appUiConfig.h"
+#include "ui/controllers/vdsPanelClient.h"
 
 #if defined(Q_OS_ANDROID)
     #include "core/utils/installedAppsImageProvider.h"
@@ -203,6 +204,7 @@ void CoreController::initControllers()
 
     m_importController = new ImportUiController(m_importCoreController, this);
     setQmlContextProperty("ImportController", m_importController);
+    setQmlContextProperty("VdsPanelClient", new VdsPanelClient(this));
 
     m_exportUiController = new ExportUiController(m_exportController, this);
     setQmlContextProperty("ExportController", m_exportUiController);
@@ -225,7 +227,9 @@ void CoreController::initControllers()
     m_serversUiController = new ServersUiController(m_serversController, m_settingsController, m_serversModel, m_containersModel, m_defaultServerContainersModel, this);
     setQmlContextProperty("ServersUiController", m_serversUiController);
 
-    m_ipSplitTunnelingUiController = new IpSplitTunnelingUiController(m_ipSplitTunnelingController, m_ipSplitTunnelingModel, this);
+    m_ipSplitTunnelingUiController = new IpSplitTunnelingUiController(m_ipSplitTunnelingController,
+                                                                      m_ipSplitTunnelingModel,
+                                                                      m_connectionController, this);
     setQmlContextProperty("IpSplitTunnelingController", m_ipSplitTunnelingUiController);
 
     m_allowedDnsUiController = new AllowedDnsUiController(m_allowedDnsController, m_allowedDnsModel, this);

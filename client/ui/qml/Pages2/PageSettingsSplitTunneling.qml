@@ -166,6 +166,16 @@ PageType {
                 text: root.routeModes[modeSelector.currentIndex].name
                 color: AmneziaStyle.color.textSecondary
             }
+
+            BodyTextType {
+                Layout.fillWidth: true
+                Layout.leftMargin: 16
+                Layout.rightMargin: 16
+                Layout.bottomMargin: 12
+                visible: IpSplitTunnelingController.managedPolicyWarning !== ""
+                text: IpSplitTunnelingController.managedPolicyWarning
+                color: AmneziaStyle.color.textSecondary
+            }
         }
 
         delegate: Item {
@@ -182,8 +192,10 @@ PageType {
                 anchors.rightMargin: 16
 
                 text: url
-                subtitle: ip
+                subtitle: IpSplitTunnelingController.isManagedBypassSite(url)
+                          ? qsTr("Managed by panel") : ip
                 trailingIconSource: "qrc:/images/controls/trash.svg"
+                enabled: !IpSplitTunnelingController.isManagedBypassSite(url)
 
                 onClicked: {
                     var headerText = qsTr("Remove ") + url + "?"
@@ -226,6 +238,34 @@ PageType {
 
     PopupMenuType {
         id: moreActionsMenu
+
+        PopupMenuItemType {
+            text: qsTr("Download direct-route list")
+
+            onClicked: {
+                moreActionsMenu.close()
+                bypassUrlField.text = IpSplitTunnelingController.managedPolicyUrl
+                bypassUrlDialog.open()
+            }
+        }
+
+        PopupMenuItemType {
+            text: qsTr("Import direct-route policy")
+
+            onClicked: {
+                moreActionsMenu.close()
+                const fileName = SystemController.getFileName(qsTr("Open direct-route policy"),
+                                                              qsTr("JSON files (*.json)"))
+                if (fileName === "") return
+                Dialogs.askQuestion(qsTr("Replace panel rules?"),
+                                    qsTr("The imported policy will replace panel rules. Manual rules will stay."),
+                                    qsTr("Continue"), qsTr("Cancel"),
+                                    function() { IpSplitTunnelingController.importManagedBypassPolicy(fileName) },
+                                    function() {})
+            }
+        }
+
+        PopupMenuSeparatorType {}
 
         PopupMenuItemType {
             id: addImportedSitesButton
@@ -279,13 +319,17 @@ PageType {
         PopupMenuItemType {
             id: clearSitesButton
 
-            text: qsTr("Clear site list")
+            text: IpSplitTunnelingController.hasManagedBypassSites
+                  ? qsTr("Clear manual sites") : qsTr("Clear site list")
             destructive: true
 
             onClicked: {
                 moreActionsMenu.close()
-                var headerText = qsTr("Clear site list?")
-                var descriptionText = qsTr("All sites will be removed from list.")
+                var headerText = IpSplitTunnelingController.hasManagedBypassSites
+                                 ? qsTr("Clear manual sites?") : qsTr("Clear site list?")
+                var descriptionText = IpSplitTunnelingController.hasManagedBypassSites
+                                      ? qsTr("Panel rules will remain active.")
+                                      : qsTr("All sites will be removed from list.")
                 var yesButtonText = qsTr("Continue")
                 var noButtonText = qsTr("Cancel")
 
@@ -299,6 +343,30 @@ PageType {
 
                 Dialogs.askQuestion(headerText, descriptionText, yesButtonText, noButtonText, yesButtonFunction, noButtonFunction)
             }
+        }
+    }
+
+    Dialog {
+        id: bypassUrlDialog
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 32, 440)
+        modal: true
+        title: qsTr("Direct-route list URL")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        onAccepted: {
+            Dialogs.askQuestion(qsTr("Replace panel rules?"),
+                                qsTr("The downloaded list will replace panel rules and refresh hourly. Manual rules will stay."),
+                                qsTr("Continue"), qsTr("Cancel"),
+                                function() { IpSplitTunnelingController.downloadManagedBypassPolicy(bypassUrlField.text) },
+                                function() {})
+        }
+
+        contentItem: TextField {
+            id: bypassUrlField
+            width: bypassUrlDialog.width - 32
+            placeholderText: qsTr("https://…/downloads/ru-bypass-ip-list.json")
+            inputMethodHints: Qt.ImhNoPredictiveText | Qt.ImhNoAutoUppercase
         }
     }
 
