@@ -94,5 +94,22 @@ session is missing or rejected by the panel.
 4. Verify AWG and VLESS on real devices.
 5. Build and sign Android and iOS artifacts with the owner's signing accounts.
 
+## Simulator previews
+
+The Android debug APK has been installed and opened in an Android 16 ARM64
+emulator. The welcome screen and connection-choice screen rendered. This
+checks the interface only; server connectivity and VPN traffic still need
+real-device tests.
+
+For iOS interface review, configure the simulator build with
+`AMNEZIA_IOS_SIMULATOR_PREVIEW=ON` and `CMAKE_OSX_SYSROOT=iphonesimulator`.
+This mode omits the Network Extension and cannot establish a VPN connection.
+The current Qt iOS simulator libraries use `x86_64`, so the simulator runtime
+must support that architecture. The iOS 26.2 Universal runtime was used for
+the local check. Build the `AmneziaVPN` target in Release, then install its
+`AmneziaVPN.app` output with `xcrun simctl install` and launch bundle ID
+`org.amnezia.AmneziaVPN` with `xcrun simctl launch`. The welcome screen rendered
+in the iPhone simulator. Keep the preview option off for device builds.
+
 The upstream project is GPL-3.0; distributed modified clients must retain the
 required source and license notices.

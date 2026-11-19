@@ -51,6 +51,11 @@ class OpenVPNAdapter(ConanFile):
     def build(self):
         with chdir(self, self.source_folder):
             xcrun = XCRun(self)
+            ios_deployment_target = (
+                f" IPHONEOS_DEPLOYMENT_TARGET={self.settings.os.version}"
+                if self._sdk in ("iphoneos", "iphonesimulator")
+                else ""
+            )
 
             xcodebuild = xcrun.find("xcodebuild")
             self.run(f"{xcodebuild}"
@@ -64,6 +69,7 @@ class OpenVPNAdapter(ConanFile):
                 " MACH_O_TYPE=staticlib"
                 " BUILD_LIBRARY_FOR_DISTRIBUTION=YES"
                 " CODE_SIGNING_ALLOWED=NO"
+                f"{ios_deployment_target}"
             )
 
             openvpnadapter = os.path.join(self.build_folder, "OpenVPNAdapter.framework", "OpenVPNAdapter")
